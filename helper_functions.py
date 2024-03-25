@@ -5,8 +5,8 @@ import pandas as pd
 def application_retriever(planningAuthority = None):
     # Accepts an optional planningAuthority field (e.g. "Galway County Council")
     # Returns dataframe of all applicaitons
-    # URL to the FeatureServer
     
+    # URL to the FeatureServer
     url = "https://services.arcgis.com/NzlPQPKn5QF9v2US/ArcGIS/rest/services/IrishPlanningApplications/FeatureServer/0/query"
 
     # Initialize parameters for pagination
@@ -92,3 +92,38 @@ def application_retriever(planningAuthority = None):
 
     # Create a DataFrame from the collected attributes and return it
     return pd.DataFrame(all_attributes)
+
+def get_county_results(df, countyName):
+    # Accepts data frame of all applications (df) and county name, e.g. "Galway County Council"
+    # Returns data frame containing the approval and refusal rates per year for that county
+    
+    county_df = df[df['PlanningAuthority'] == countyName].copy()
+    county_df['Received Year'] = pd.to_datetime(county_df['ReceivedDate']).dt.year
+
+    results_df = pd.DataFrame(columns=['Received Year', 'Conditional Rate', 'Refusal Rate', 'Unconditional Rate'])
+
+    rows_list = []
+
+    for year in sorted(county_df['Received Year'].unique()):
+        year_data = county_df[county_df['Received Year'] == year]
+        total_decisions = len(year_data)
+        
+        conditional_rate = ((year_data['Decision'].str.strip() == 'CONDITIONAL').sum() / total_decisions * 100) if total_decisions > 0 else 0
+        refusal_rate = ((year_data['Decision'].str.strip() == 'REFUSED').sum() / total_decisions * 100) if total_decisions > 0 else 0
+        unconditional_rate = ((year_data['Decision'].str.strip() == 'UNCONDITIONAL').sum() / total_decisions * 100) if total_decisions > 0 else 0
+        
+        rows_list.append({
+            'Received Year': year,
+            'Conditional Rate': round(conditional_rate, 2),
+            'Refusal Rate': round(refusal_rate, 2),
+            'Unconditional Rate': round(unconditional_rate, 2)
+        })
+
+    results_df = pd.DataFrame(rows_list)
+    results_df['Received Year'] = results_df['Received Year'].astype(int)
+
+
+    # Ensure 'Received Year' column is of type int
+    results_df['Received Year'] = results_df['Received Year'].astype(int)
+    # Return the DataFrame
+    return results_df
